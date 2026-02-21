@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClockIn — Location Work Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --card: #1a1a26;
+    --border: #2a2a3d;
+    --accent: #00e5b4;
+    --accent2: #ff4d6d;
+    --text: #e8e8f0;
+    --muted: #6b6b8a;
+    --warning: #ffc247;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(ellipse at 30% 20%, rgba(0,229,180,0.04) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 80%, rgba(255,77,109,0.04) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 3rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+  }
+
+  .logo span { color: var(--accent); }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    padding: 0.4rem 0.9rem;
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    transition: all 0.4s;
+  }
+
+  .status-pill.clocked-in {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0,229,180,0.08);
+  }
+
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.4s;
+  }
+
+  .status-pill.clocked-in .status-dot {
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* Main clock display */
+  .clock-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 2.5rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .clock-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+
+  .clock-card.active::after { opacity: 1; }
+
+  .time-display {
+    font-family: 'Space Mono', monospace;
+    font-size: clamp(3rem, 10vw, 5.5rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+    transition: color 0.4s;
+  }
+
+  .time-display.clocked-in { color: var(--accent); }
+
+  .session-label {
+    font-size: 0.8rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    font-family: 'Space Mono', monospace;
+    margin-bottom: 2rem;
+  }
+
+  /* Location setup */
+  .section-title {
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    margin-bottom: 1rem;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+  }
+
+  input[type="text"], input[type="number"] {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem;
+    padding: 0.7rem 1rem;
+    flex: 1;
+    min-width: 140px;
+    transition: border-color 0.3s;
+    outline: none;
+  }
+
+  input:focus { border-color: var(--accent); }
+  input::placeholder { color: var(--muted); }
+
+  .btn {
+    padding: 0.7rem 1.4rem;
+    border-radius: 10px;
+    border: none;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.02em;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+  }
+
+  .btn-primary:hover { background: #00ffc8; transform: translateY(-1px); }
+
+  .btn-danger {
+    background: transparent;
+    color: var(--accent2);
+    border: 1px solid var(--accent2);
+  }
+
+  .btn-danger:hover { background: rgba(255,77,109,0.1); }
+
+  .btn-secondary {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Location list */
+  .location-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.8rem 1rem;
+    background: var(--surface);
+    border-radius: 10px;
+    margin-bottom: 0.5rem;
+    border: 1px solid var(--border);
+    font-size: 0.85rem;
+    transition: border-color 0.3s;
+  }
+
+  .location-item.active-location {
+    border-color: var(--accent);
+    background: rgba(0,229,180,0.05);
+  }
+
+  .location-name { font-weight: 700; margin-bottom: 0.2rem; }
+  .location-coords { font-family: 'Space Mono', monospace; font-size: 0.72rem; color: var(--muted); }
+  .location-radius { font-family: 'Space Mono', monospace; font-size: 0.72rem; color: var(--warning); }
+
+  /* Log table */
+  .log-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+  }
+
+  .log-table th {
+    text-align: left;
+    padding: 0.6rem 0.8rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .log-table td {
+    padding: 0.75rem 0.8rem;
+    border-bottom: 1px solid rgba(42,42,61,0.5);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.78rem;
+  }
+
+  .log-table tr:last-child td { border-bottom: none; }
+  .log-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 100px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+
+  .badge-in { background: rgba(0,229,180,0.15); color: var(--accent); }
+  .badge-out { background: rgba(255,77,109,0.15); color: var(--accent2); }
+
+  .total-hours {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 1rem;
+    margin-top: 1rem;
+    border-top: 1px solid var(--border);
+    font-family: 'Space Mono', monospace;
+  }
+
+  .total-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+  .total-value { font-size: 1.1rem; font-weight: 700; color: var(--accent); }
+
+  .geo-info {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 1rem;
+  }
+
+  .alert {
+    padding: 0.8rem 1.2rem;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    margin-bottom: 1rem;
+    font-family: 'Space Mono', monospace;
+    display: none;
+  }
+
+  .alert-info { background: rgba(0,229,180,0.1); border: 1px solid rgba(0,229,180,0.3); color: var(--accent); }
+  .alert-warn { background: rgba(255,196,71,0.1); border: 1px solid rgba(255,196,71,0.3); color: var(--warning); }
+  .alert-err  { background: rgba(255,77,109,0.1); border: 1px solid rgba(255,77,109,0.3); color: var(--accent2); }
+  .alert.show { display: block; }
+
+  .divider { height: 1px; background: var(--border); margin: 1.5rem 0; }
+
+  .empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.8rem;
+  }
+
+  .flex-row { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+  .flex-between { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; flex-wrap: wrap; gap: 0.5rem; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="logo">Clock<span>In</span></div>
+    <div class="status-pill" id="statusPill">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">NOT TRACKING</span>
+    </div>
+  </header>
+
+  <!-- Current session timer -->
+  <div class="clock-card" id="clockCard">
+    <div class="time-display" id="timerDisplay">00:00:00</div>
+    <div class="session-label" id="sessionLabel">NO ACTIVE SESSION</div>
+    <div class="geo-info" id="geoInfo">Waiting for location permission...</div>
+  </div>
+
+  <div id="alertBox" class="alert"></div>
+
+  <!-- Location Setup -->
+  <div class="card">
+    <p class="section-title">Work Locations</p>
+    <div class="input-row">
+      <input type="text" id="locName" placeholder="Location name (e.g. Office)" />
+      <input type="number" id="locRadius" placeholder="Radius (m)" value="100" min="10" max="5000" style="max-width:140px" />
+    </div>
+    <div class="flex-row">
+      <button class="btn btn-primary" onclick="captureCurrentLocation()">📍 Use My Current Location</button>
+      <button class="btn btn-secondary" onclick="startTracking()">▶ Start Tracking</button>
+      <button class="btn btn-danger" onclick="stopTracking()">■ Stop</button>
+    </div>
+    <div id="locationList" style="margin-top:1.2rem"></div>
+  </div>
+
+  <!-- Log -->
+  <div class="card">
+    <div class="flex-between">
+      <p class="section-title" style="margin-bottom:0">Session Log</p>
+      <button class="btn btn-danger" onclick="clearLog()" style="font-size:0.75rem; padding:0.4rem 0.9rem">Clear Log</button>
+    </div>
+    <div id="logContainer">
+      <div class="empty-state">No sessions logged yet.</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let locations = JSON.parse(localStorage.getItem('clockin_locations') || '[]');
+let log       = JSON.parse(localStorage.getItem('clockin_log') || '[]');
+let tracking  = false;
+let watchId   = null;
+let currentLocation = null; // which location we're clocked into
+let clockInTime = null;
+let timerInterval = null;
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function save() {
+  localStorage.setItem('clockin_locations', JSON.stringify(locations));
+  localStorage.setItem('clockin_log', JSON.stringify(log));
+}
+
+function haversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function fmt(date) {
+  return new Date(date).toLocaleString();
+}
+
+function duration(ms) {
+  const s = Math.floor(ms/1000);
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+
+function showAlert(msg, type='info') {
+  const el = document.getElementById('alertBox');
+  el.className = `alert alert-${type} show`;
+  el.textContent = msg;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+// ── Location capture ───────────────────────────────────────────────────────
+function captureCurrentLocation() {
+  const name = document.getElementById('locName').value.trim();
+  const radius = parseInt(document.getElementById('locRadius').value) || 100;
+  if (!name) { showAlert('Please enter a location name first.', 'warn'); return; }
+
+  if (!navigator.geolocation) { showAlert('Geolocation not supported.', 'err'); return; }
+
+  navigator.geolocation.getCurrentPosition(pos => {
+    const loc = {
+      id: Date.now(),
+      name,
+      lat: pos.coords.latitude,
+      lon: pos.coords.longitude,
+      radius
+    };
+    locations.push(loc);
+    save();
+    document.getElementById('locName').value = '';
+    renderLocations();
+    showAlert(`"${name}" saved at your current position (±${radius}m).`, 'info');
+  }, err => {
+    showAlert('Could not get location: ' + err.message, 'err');
+  }, { enableHighAccuracy: true });
+}
+
+function deleteLocation(id) {
+  locations = locations.filter(l => l.id !== id);
+  save();
+  renderLocations();
+}
+
+// ── Tracking ───────────────────────────────────────────────────────────────
+function startTracking() {
+  if (tracking) { showAlert('Already tracking.', 'warn'); return; }
+  if (locations.length === 0) { showAlert('Add at least one work location first.', 'warn'); return; }
+  if (!navigator.geolocation) { showAlert('Geolocation not supported.', 'err'); return; }
+
+  tracking = true;
+  showAlert('Location tracking started.', 'info');
+
+  watchId = navigator.geolocation.watchPosition(onPosition, onGeoError, {
+    enableHighAccuracy: true,
+    maximumAge: 15000,
+    timeout: 20000
+  });
+}
+
+function stopTracking() {
+  if (!tracking) return;
+  tracking = false;
+  if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+  if (currentLocation) clockOut(null, 'Tracking stopped');
+  document.getElementById('geoInfo').textContent = 'Tracking stopped.';
+  setStatus(false);
+  showAlert('Tracking stopped.', 'warn');
+}
+
+function onPosition(pos) {
+  const { latitude: lat, longitude: lon, accuracy } = pos.coords;
+  document.getElementById('geoInfo').textContent =
+    `📍 ${lat.toFixed(5)}, ${lon.toFixed(5)} · ±${Math.round(accuracy)}m`;
+
+  // Find matching location
+  const matched = locations.find(l => haversineDistance(lat, lon, l.lat, l.lon) <= l.radius);
+
+  if (matched && !currentLocation) {
+    // Entered a zone
+    clockIn(matched);
+  } else if (!matched && currentLocation) {
+    // Left the zone
+    clockOut(currentLocation, 'Left zone');
+  } else if (matched && currentLocation && matched.id !== currentLocation.id) {
+    // Switched zones
+    clockOut(currentLocation, 'Switched location');
+    clockIn(matched);
+  }
+
+  renderLocations(matched);
+}
+
+function onGeoError(err) {
+  document.getElementById('geoInfo').textContent = '⚠ Location error: ' + err.message;
+}
+
+function clockIn(loc) {
+  currentLocation = loc;
+  clockInTime = Date.now();
+  setStatus(true, loc.name);
+  showAlert(`Clocked IN at "${loc.name}"`, 'info');
+  startTimer();
+  renderLog();
+}
+
+function clockOut(loc, reason) {
+  if (!clockInTime) return;
+  const entry = {
+    location: loc ? loc.name : (currentLocation ? currentLocation.name : 'Unknown'),
+    clockIn: clockInTime,
+    clockOut: Date.now(),
+    duration: Date.now() - clockInTime,
+    reason
+  };
+  log.unshift(entry);
+  save();
+  currentLocation = null;
+  clockInTime = null;
+  stopTimer();
+  setStatus(false);
+  showAlert(`Clocked OUT — ${duration(entry.duration)} logged`, 'info');
+  renderLog();
+}
+
+// ── Timer ──────────────────────────────────────────────────────────────────
+function startTimer() {
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    if (clockInTime) {
+      document.getElementById('timerDisplay').textContent = duration(Date.now() - clockInTime);
+    }
+  }, 1000);
+}
+
+function stopTimer() {
+  clearInterval(timerInterval);
+  document.getElementById('timerDisplay').textContent = '00:00:00';
+  document.getElementById('sessionLabel').textContent = 'NO ACTIVE SESSION';
+  document.getElementById('clockCard').classList.remove('active');
+  document.getElementById('timerDisplay').classList.remove('clocked-in');
+}
+
+function setStatus(on, locName) {
+  const pill = document.getElementById('statusPill');
+  const text = document.getElementById('statusText');
+  if (on) {
+    pill.classList.add('clocked-in');
+    text.textContent = `IN · ${locName}`;
+    document.getElementById('sessionLabel').textContent = `SESSION AT ${locName.toUpperCase()}`;
+    document.getElementById('clockCard').classList.add('active');
+    document.getElementById('timerDisplay').classList.add('clocked-in');
+  } else {
+    pill.classList.remove('clocked-in');
+    text.textContent = tracking ? 'TRACKING' : 'NOT TRACKING';
+  }
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function renderLocations(active) {
+  const el = document.getElementById('locationList');
+  if (locations.length === 0) { el.innerHTML = ''; return; }
+  el.innerHTML = locations.map(l => `
+    <div class="location-item ${active && active.id === l.id ? 'active-location' : ''}">
+      <div>
+        <div class="location-name">${l.name} ${active && active.id === l.id ? '🟢' : ''}</div>
+        <div class="location-coords">${l.lat.toFixed(5)}, ${l.lon.toFixed(5)}</div>
+        <div class="location-radius">±${l.radius}m radius</div>
+      </div>
+      <button class="btn btn-danger" style="font-size:0.75rem;padding:0.35rem 0.8rem" onclick="deleteLocation(${l.id})">Remove</button>
+    </div>
+  `).join('');
+}
+
+function renderLog() {
+  const el = document.getElementById('logContainer');
+  if (log.length === 0) { el.innerHTML = '<div class="empty-state">No sessions logged yet.</div>'; return; }
+
+  const totalMs = log.reduce((a, e) => a + e.duration, 0);
+
+  el.innerHTML = `
+    <table class="log-table">
+      <thead>
+        <tr>
+          <th>Location</th>
+          <th>Clock In</th>
+          <th>Clock Out</th>
+          <th>Duration</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${log.map(e => `
+          <tr>
+            <td><span class="badge badge-in">${e.location}</span></td>
+            <td>${fmt(e.clockIn)}</td>
+            <td>${fmt(e.clockOut)}</td>
+            <td>${duration(e.duration)}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    <div class="total-hours">
+      <span class="total-label">Total Logged</span>
+      <span class="total-value">${duration(totalMs)}</span>
+    </div>
+  `;
+}
+
+function clearLog() {
+  if (!confirm('Clear all logged sessions?')) return;
+  log = [];
+  save();
+  renderLog();
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+renderLocations();
+renderLog();
+</script>
+</body>
+</html>
